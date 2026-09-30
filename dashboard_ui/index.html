@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tender Boshqaruv Markazi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; color: #0f172a; }
+        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(226, 232, 240, 0.8); }
+        .stat-card { transition: all 0.3s ease; }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01); }
+        .badge { display: inline-flex; align-items: center; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        [v-cloak] { display: none; }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 900: '#1e3a8a' },
+                        surface: '#ffffff'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="antialiased min-h-screen flex flex-col selection:bg-primary-200 selection:text-primary-900">
+    <div id="app" v-cloak class="flex flex-col min-h-screen">
+        
+        <!-- Modern Navbar -->
+        <nav class="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-30">
+            <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-gradient-to-br from-primary-500 to-primary-700 text-white p-2 rounded-lg shadow-sm shadow-primary-500/30">
+                            <i class="fa-solid fa-briefcase text-xl"></i>
+                        </div>
+                        <div>
+                            <h1 class="font-bold text-xl tracking-tight text-gray-900 leading-none">Tenderlar</h1>
+                            <span class="text-[10px] uppercase font-bold text-primary-600 tracking-wider">Boshqaruv tizimi</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-6">
+                        <!-- Notification Hint (Small) -->
+                        <div class="hidden md:flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full text-xs text-slate-600 cursor-help" title="Bot Eslatmalari: 2 kun qolganda (1x), 1 kun qolganda (2x), oxirgi 12 soatda (4x)">
+                            <i class="fa-solid fa-bell text-amber-500"></i>
+                            <span class="font-medium">Eslatmalar: Yoqilgan</span>
+                        </div>
+                        
+                        <!-- Live Clock -->
+                        <div class="flex flex-col items-end">
+                            <div class="text-sm font-bold text-gray-800 tabular-nums tracking-tight flex items-center gap-1.5">
+                                <i class="fa-regular fa-clock text-primary-500"></i>
+                                {{ currentTime }}
+                            </div>
+                            <div class="text-xs font-medium text-gray-500">{{ currentDate }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="flex-1 w-full max-w-screen-2xl mx-auto p-4 sm:p-6 lg:p-8">
+            
+            <!-- Quick Stats -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6 mb-8">
+                
+                <div class="stat-card glass-card rounded-2xl p-5 border-l-4 border-l-blue-500 cursor-pointer relative overflow-hidden group" @click="filterType = 'all'" :class="{'ring-2 ring-blue-500 ring-offset-2': filterType === 'all'}">
+                    <div class="absolute -right-4 -top-4 w-16 h-16 bg-blue-50 rounded-full transition-transform group-hover:scale-150"></div>
+                    <div class="relative z-10 flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Bugun qo'shilganlar</p>
+                            <h3 class="text-3xl font-extrabold text-gray-900">{{ stats.today_count || 0 }}</h3>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner">
+                            <i class="fa-solid fa-inbox"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card glass-card rounded-2xl p-5 border-l-4 border-l-rose-500 cursor-pointer relative overflow-hidden group" @click="filterType = 'urgent'" :class="{'ring-2 ring-rose-500 ring-offset-2': filterType === 'urgent'}">
+                    <div class="absolute -right-4 -top-4 w-16 h-16 bg-rose-50 rounded-full transition-transform group-hover:scale-150"></div>
+                    <div class="relative z-10 flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">1 Kun Qoldi</p>
+                            <h3 class="text-3xl font-extrabold text-gray-900">{{ stats.urgent_count || 0 }}</h3>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shadow-inner">
+                            <i class="fa-solid fa-fire"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card glass-card rounded-2xl p-5 border-l-4 border-l-emerald-500 cursor-pointer relative overflow-hidden group" @click="filterType = 'far'" :class="{'ring-2 ring-emerald-500 ring-offset-2': filterType === 'far'}">
+                    <div class="absolute -right-4 -top-4 w-16 h-16 bg-emerald-50 rounded-full transition-transform group-hover:scale-150"></div>
+                    <div class="relative z-10 flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Uzoq muddatli</p>
+                            <h3 class="text-3xl font-extrabold text-gray-900">{{ stats.far_count || 0 }}</h3>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-inner">
+                            <i class="fa-solid fa-calendar-check"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card glass-card rounded-2xl p-5 border-l-4 border-l-slate-400 cursor-pointer relative overflow-hidden group" @click="filterType = 'archive'" :class="{'ring-2 ring-slate-400 ring-offset-2': filterType === 'archive'}">
+                    <div class="absolute -right-4 -top-4 w-16 h-16 bg-slate-50 rounded-full transition-transform group-hover:scale-150"></div>
+                    <div class="relative z-10 flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Arxiv</p>
+                            <h3 class="text-3xl font-extrabold text-gray-900">{{ stats.archive_count || 0 }}</h3>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center shadow-inner">
+                            <i class="fa-solid fa-box-archive"></i>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Table Section -->
+            <div class="glass-card rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <!-- Toolbar -->
+                <div class="p-4 border-b border-gray-100 bg-white/50 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div class="flex items-center gap-3">
+                        <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            <span v-if="filterType === 'all'"><i class="fa-solid fa-list text-blue-500"></i> Barcha Faol Lotlar</span>
+                            <span v-if="filterType === 'urgent'"><i class="fa-solid fa-fire text-rose-500"></i> Shoshilinch Lotlar</span>
+                            <span v-if="filterType === 'far'"><i class="fa-solid fa-calendar-check text-emerald-500"></i> Uzoq Muddatlilar</span>
+                            <span v-if="filterType === 'archive'"><i class="fa-solid fa-box-archive text-slate-500"></i> Arxiv (Tugagan/Rad etilgan)</span>
+                        </h2>
+                    </div>
+                    <div class="relative w-full md:w-80">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fa-solid fa-search text-gray-400 text-sm"></i>
+                        </div>
+                        <input type="text" v-model="searchTender" placeholder="Lot nomi, tashkilot, yoki summa bo'yicha..." 
+                            class="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-xl leading-5 bg-slate-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:bg-white sm:text-sm transition-colors">
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50/50">
+                            <tr>
+                                <th scope="col" class="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider w-1/4">Lot Nomi & Manba</th>
+                                <th scope="col" class="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider w-1/4">Tashkilot</th>
+                                <th scope="col" class="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider w-1/5">Summa & Zakalat</th>
+                                <th scope="col" class="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider w-1/5">Muddatlar</th>
+                                <th scope="col" class="px-6 py-4 text-center text-[11px] font-bold text-gray-500 uppercase tracking-wider">Harakatlar</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-100">
+                            <tr v-for="t in filteredTenders" :key="t.id" 
+                                class="hover:bg-slate-50 transition-colors" 
+                                :class="{'bg-rose-50/30 hover:bg-rose-50/60': isUrgent(t.deadline) && t.status === 'active', 'opacity-70': t.status === 'rejected' || isExpired(t.deadline)}">
+                                
+                                <td class="px-6 py-4 whitespace-normal">
+                                    <div class="text-sm font-semibold text-gray-900 leading-tight mb-1">{{ t.title }}</div>
+                                    <span class="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                                        <i class="fa-solid fa-link"></i> {{ t.source_site }}
+                                    </span>
+                                </td>
+                                
+                                <td class="px-6 py-4 whitespace-normal">
+                                    <div class="text-sm text-gray-600 font-medium leading-tight">{{ t.company_name }}</div>
+                                </td>
+                                
+                                <td class="px-6 py-4 whitespace-normal">
+                                    <div class="text-sm font-extrabold text-emerald-600 mb-1 tracking-tight">{{ t.total_sum }}</div>
+                                    <div class="text-[11px] text-gray-500 font-medium bg-slate-100 px-2 py-1 rounded inline-block border border-slate-200">
+                                        Zakalat: {{ t.deposit_sum }}
+                                    </div>
+                                </td>
+                                
+                                <td class="px-6 py-4 whitespace-normal">
+                                    <div class="flex items-center gap-2 mb-1.5 text-xs text-gray-500 font-medium">
+                                        <div class="w-4 h-4 rounded bg-blue-100 text-blue-600 flex justify-center items-center"><i class="fa-solid fa-play text-[8px]"></i></div>
+                                        {{ formatDate(t.start_date) }}
+                                    </div>
+                                    <div class="flex items-center gap-2 mb-1.5 text-xs font-bold" :class="{'text-rose-600': isUrgent(t.deadline) && t.status === 'active', 'text-gray-700': !isUrgent(t.deadline) || t.status !== 'active'}">
+                                        <div class="w-4 h-4 rounded flex justify-center items-center" :class="{'bg-rose-100': isUrgent(t.deadline) && t.status === 'active', 'bg-gray-100': !isUrgent(t.deadline) || t.status !== 'active'}">
+                                            <i class="fa-solid fa-flag-checkered text-[8px]"></i>
+                                        </div>
+                                        {{ formatDate(t.deadline) }}
+                                    </div>
+                                    <div class="flex items-center gap-2 text-[11px] text-gray-400 font-medium">
+                                        <i class="fa-solid fa-truck-fast"></i> {{ t.delivery_term }}
+                                    </div>
+                                </td>
+                                
+                                <td class="px-6 py-4 whitespace-nowrap text-center">
+                                    <div class="flex flex-col gap-1.5 items-center w-28 mx-auto">
+                                        <a :href="t.link" target="_blank" class="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 px-3 py-1.5 rounded-lg shadow-sm transition">
+                                            Ko'rish <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                                        </a>
+                                        
+                                        <template v-if="t.status === 'active' && !isExpired(t.deadline)">
+                                            <button @click="updateStatus(t.id, 'played')" class="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 border border-emerald-200 px-3 py-1.5 rounded-lg transition">
+                                                <i class="fa-solid fa-check"></i> O'ynaldi
+                                            </button>
+                                            <button @click="updateStatus(t.id, 'rejected')" class="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-100 hover:bg-rose-200 border border-rose-200 px-3 py-1.5 rounded-lg transition">
+                                                <i class="fa-solid fa-xmark"></i> Rad qilish
+                                            </button>
+                                        </template>
+                                        
+                                        <template v-else-if="t.status === 'played'">
+                                            <div class="w-full flex items-center justify-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1.5 rounded-lg">
+                                                <i class="fa-solid fa-circle-check text-emerald-500"></i> O'ynaldi
+                                            </div>
+                                        </template>
+                                        <template v-else-if="t.status === 'rejected'">
+                                            <div class="w-full flex items-center justify-center gap-1 text-[11px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-1.5 rounded-lg">
+                                                <i class="fa-solid fa-ban text-slate-400"></i> Rad etilgan
+                                            </div>
+                                        </template>
+                                        <template v-else-if="isExpired(t.deadline)">
+                                            <div class="w-full flex items-center justify-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1.5 rounded-lg">
+                                                <i class="fa-solid fa-clock-rotate-left"></i> Vaqti o'tdi
+                                            </div>
+                                        </template>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-if="filteredTenders.length === 0">
+                                <td colspan="5" class="px-6 py-16 text-center">
+                                    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 text-slate-400 mb-4">
+                                        <i class="fa-solid fa-folder-open text-2xl"></i>
+                                    </div>
+                                    <h3 class="text-lg font-medium text-slate-900 mb-1">Ma'lumot topilmadi</h3>
+                                    <p class="text-sm text-slate-500">Ushbu bo'limda hozircha tenderlar yo'q.</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+        
+        <footer class="bg-white border-t border-gray-200 mt-auto py-5">
+            <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs font-medium text-slate-500">
+                <p>&copy; 2026 Tender Boshqaruv Tizimi</p>
+                <p class="flex items-center gap-1">Created with <i class="fa-solid fa-heart text-rose-500"></i> by <span class="text-slate-800 font-bold">UNICON-SOFT</span></p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    tenders: [],
+                    stats: {},
+                    searchTender: '',
+                    filterType: 'all',
+                    currentTime: '',
+                    currentDate: '',
+                    keyBuffer: '' // For "qayt eskiga" secret code
+                }
+            },
+            computed: {
+                filteredTenders() {
+                    let result = this.tenders;
+                    if (this.filterType === 'urgent') {
+                        result = result.filter(t => this.isUrgent(t.deadline) && !this.isExpired(t.deadline) && t.status !== 'rejected');
+                    } else if (this.filterType === 'far') {
+                        result = result.filter(t => !this.isUrgent(t.deadline) && !this.isExpired(t.deadline) && t.status !== 'rejected');
+                    } else if (this.filterType === 'archive') {
+                        result = result.filter(t => this.isExpired(t.deadline) || t.status === 'rejected');
+                    } else if (this.filterType === 'all') {
+                        result = result.filter(t => !this.isExpired(t.deadline) && t.status !== 'rejected');
+                    }
+                    if (this.searchTender) {
+                        const s = this.searchTender.toLowerCase();
+                        result = result.filter(t => 
+                            (t.title && t.title.toLowerCase().includes(s)) || 
+                            (t.company_name && t.company_name.toLowerCase().includes(s)) ||
+                            (t.total_sum && t.total_sum.toLowerCase().includes(s))
+                        );
+                    }
+                    return result;
+                }
+            },
+            methods: {
+                async fetchData() {
+                    try {
+                        const [resTenders, resStats] = await Promise.all([
+                            fetch('/api/tenders'),
+                            fetch('/api/stats')
+                        ]);
+                        this.tenders = await resTenders.json();
+                        this.stats = await resStats.json();
+                    } catch (e) {
+                        console.error("Yuklash xatosi:", e);
+                    }
+                },
+                formatDate(dateString) {
+                    if (!dateString) return 'Noma\'lum';
+                    const d = new Date(dateString);
+                    return d.toLocaleDateString('uz-UZ') + ' ' + d.toLocaleTimeString('uz-UZ', {hour: '2-digit', minute:'2-digit'});
+                },
+                isUrgent(dateString) {
+                    if (!dateString) return false;
+                    const diff = new Date(dateString) - new Date();
+                    return diff > 0 && diff <= (24 * 60 * 60 * 1000);
+                },
+                isExpired(dateString) {
+                    if (!dateString) return false;
+                    return new Date(dateString) <= new Date();
+                },
+                async updateStatus(tenderId, newStatus) {
+                    try {
+                        const res = await fetch(`/api/tenders/${tenderId}/status`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status: newStatus })
+                        });
+                        if (res.ok) {
+                            const t = this.tenders.find(x => x.id === tenderId);
+                            if (t) t.status = newStatus;
+                            this.fetchData();
+                        }
+                    } catch (e) {
+                        console.error("Xatolik:", e);
+                    }
+                },
+                updateClock() {
+                    const now = new Date();
+                    this.currentTime = now.toLocaleTimeString('uz-UZ', {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+                    this.currentDate = now.toLocaleDateString('uz-UZ', {year: 'numeric', month: 'long', day: 'numeric'});
+                },
+                handleKeydown(e) {
+                    // "qayt eskiga" siri
+                    this.keyBuffer += e.key.toLowerCase();
+                    if (this.keyBuffer.length > 20) {
+                        this.keyBuffer = this.keyBuffer.slice(-20);
+                    }
+                    if (this.keyBuffer.includes("qayt eskiga")) {
+                        window.location.href = '/old';
+                    }
+                }
+            },
+            mounted() {
+                this.fetchData();
+                setInterval(this.fetchData, 30000);
+                
+                this.updateClock();
+                setInterval(this.updateClock, 1000);
+                
+                window.addEventListener('keydown', this.handleKeydown);
+            },
+            unmounted() {
+                window.removeEventListener('keydown', this.handleKeydown);
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>
