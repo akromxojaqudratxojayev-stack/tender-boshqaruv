@@ -43,12 +43,22 @@ async def parse_tender(url: str):
                     end_str = data.get('end_date', '')
                     
                     js_products = data.get('js_products', '[]')
+                    items_list = []
                     try:
                         products = json.loads(js_products)
                         if isinstance(products, list) and len(products) > 0:
                             dl = products[0].get('Delivery_Term')
                             if dl: delivery_term = f"{dl} Kun"
+                            for idx, p in enumerate(products):
+                                p_name = p.get('Product_Name', 'Tovar')
+                                p_qty = p.get('Quantity', 1)
+                                p_unit = p.get('Measure_Name', 'sht')
+                                items_list.append(f"{idx+1}. {p_name} — {p_qty} {p_unit}")
                     except: pass
+                    
+                    items_str = ""
+                    if items_list:
+                        items_str = "\n\n📦 <b>Tovarlar:</b>\n" + "\n".join(items_list)
                     
                     start_date = datetime.strptime(start_str.split('.')[0], "%Y-%m-%dT%H:%M:%S") if start_str else datetime.now()
                     deadline = datetime.strptime(end_str.split('.')[0], "%Y-%m-%dT%H:%M:%S") if end_str else (datetime.now() + timedelta(days=3))
@@ -62,15 +72,16 @@ async def parse_tender(url: str):
                         "delivery_term": delivery_term,
                         "start_date": start_date,
                         "deadline": deadline,
-                        "source_site": source_site
+                        "source_site": source_site,
+                        "items_str": items_str
                     }
+        
     except Exception as e:
-        print("API dan olishda xatolik:", e)
-        pass
+        print("API orqali o'qishda xatolik:", e)
         
     # Playwright orqali o'qish (ko'rinmas brauzer) barcha saytlar uchun
     try:
-                async with async_playwright() as p:
+        async with async_playwright() as p:
             browser = await p.chromium.launch(
                 headless=True,
                 args=[
@@ -87,7 +98,6 @@ async def parse_tender(url: str):
             context = await browser.new_context(locale="uz-UZ")
             page = await context.new_page()
             
-            # xt-xarid uchun ko'proq kutamiz chunki u React/Vue da qilingan va ma'lumot kech yuklanadi
             await page.goto(url, wait_until="networkidle", timeout=60000)
             
             if "xt-xarid.uz" in url:
@@ -117,15 +127,15 @@ async def parse_tender(url: str):
             
             # Xarid.uzex.uz uchun
             if "xarid.uzex.uz" in url:
-                sum_matches = re.findall(r"Boshlangich summa[^\d]*(\d+)", page_text, re.IGNORECASE)
+                sum_matches = re.findall(r"Boshlang.*?ich summa\s*([\d\s\xa0]+)", page_text, re.IGNORECASE)
                 if sum_matches:
-                    total_sum = f"{int(sum_matches[0]):,.0f} UZS".replace(',', ' ')
+                    total_sum = sum_matches[0].strip() + " UZS"
                 
-                cat_matches = re.findall(r"Tovar kategoriyasi:\n+(.+?)\n", page_text, re.IGNORECASE)
+                cat_matches = re.findall(r"(?:Tovar kategoriyasi|Toifa):\s*(.+?)\n", page_text, re.IGNORECASE)
                 if cat_matches:
                     title = cat_matches[0].strip()
                     
-                del_matches = re.findall(r"Yetkazib berish muddati:\n+(\d+)", page_text, re.IGNORECASE)
+                del_matches = re.findall(r"muddati[^\d]*(\d+)", page_text, re.IGNORECASE)
                 if del_matches:
                     delivery_term = f"{del_matches[0].strip()} Kun"
                     
@@ -162,7 +172,7 @@ async def parse_tender(url: str):
                     import bs4
                     plain_text = bs4.BeautifulSoup(page_html, 'html.parser').text
                     # 'narx' yoki 'summa' so'ziga yaqin raqamlarni qidiramiz
-                    val_matches = re.findall(r'(?:нарх|narx|summa|narxi)[^\d]{0,80}?(\d{1,3}(?: \d{3})*(?:\.\d{2})?)\s*(?:UZS|Ўзбек сўми|Сўм|so\'m)', plain_text, re.IGNORECASE)
+                    val_matches = re.findall(r'(?:нархи|narx|summa|narxi)[^\d]{0,80}?(\d{1,3}(?: \d{3})*(?:\.\d{2})?)\s*(?:UZS|СУМ|сўм|so\'m)', plain_text, re.IGNORECASE)
                     if val_matches:
                         # Topilgan summalar ichidan eng kattasini olamiz (Jami summa)
                         max_val = 0
@@ -214,7 +224,7 @@ async def parse_tender(url: str):
                                 numeric_sum = float(clean_sum)
                                 calculated_deposit = (numeric_sum * percent) / 100
                                 formatted_deposit = f"{calculated_deposit:,.0f} UZS".replace(',', ' ')
-                                deposit_sum = f"{deposit_sum} — {formatted_deposit}"
+                                deposit_sum = f"{deposit_sum} ≈ {formatted_deposit}"
                     except: pass
                     
                 # 5. Sanalar
@@ -240,6 +250,32 @@ async def parse_tender(url: str):
                 if delivery_matches:
                     delivery_term = delivery_matches[0].strip()
             
+            # Extract products for xarid.uzex.uz via JS
+            items_str = ""
+            if "xarid.uzex.uz" in url:
+                js_extract = '''() => {
+                    let res = [];
+                    document.querySelectorAll('.lot__products__item').forEach((item, index) => {
+                        let nameEl = item.querySelector('h5');
+                        if (nameEl) {
+                            let name = nameEl.innerText.replace(/^[0-9]+\s*/, '').trim();
+                            let trs = item.querySelectorAll('tbody tr');
+                            if (trs.length > 0) {
+                                let tds = trs[0].querySelectorAll('td');
+                                if (tds.length >= 2) {
+                                    let qty = tds[0].innerText.trim();
+                                    let unit = tds[1].innerText.trim();
+                                    res.push((index + 1) + '. ' + name + ' — ' + qty + ' ' + unit);
+                                }
+                            }
+                        }
+                    });
+                    return res;
+                }'''
+                extracted_items = await page.evaluate(js_extract)
+                if extracted_items:
+                    items_str = "\n\n📦 <b>Tovarlar:</b>\n" + "\n".join(extracted_items)
+            
             await browser.close()
             
             return {
@@ -251,7 +287,8 @@ async def parse_tender(url: str):
                 "delivery_term": delivery_term,
                 "start_date": start_date,
                 "deadline": deadline,
-                "source_site": source_site
+                "source_site": source_site,
+                "items_str": items_str
             }
             
     except Exception as e:
