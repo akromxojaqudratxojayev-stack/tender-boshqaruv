@@ -83,13 +83,14 @@ def handle_link(message):
 def build_tender_text(data, is_update=False):
     title_prefix = "🔄 <b>Tender ma'lumotlari yangilandi!</b>" if is_update else "✅ <b>Yangi tender tizimga qo'shildi!</b>"
     items_str = data.get('items_str', '')
+    delivery = data.get('delivery_term', "Noma'lum")
     return (
         f"{title_prefix}\n\n"
         f"📌 <b>Lot nomi:</b> {data['title']}\n"
         f"🏢 <b>Tashkilot:</b> {data['company_name']}\n"
         f"💰 <b>Jami summa:</b> {data['total_sum']}\n"
         f"🔒 <b>Zakalat:</b> {data['deposit_sum']}\n"
-        f"🚚 <b>Yetkazib berish muddati:</b> {data.get('delivery_term', 'Noma\\'lum')}\n"
+        f"🚚 <b>Yetkazib berish muddati:</b> {delivery}\n"
         f"📅 <b>Boshlanish:</b> {data['start_date'].strftime('%Y-%m-%d %H:%M')}\n"
         f"⏳ <b>Tugash vaqti:</b> {data['deadline'].strftime('%Y-%m-%d %H:%M')}\n"
         f"{items_str}\n\n"
