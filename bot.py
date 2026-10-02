@@ -218,9 +218,9 @@ def handle_reject(call):
     except Exception as e:
         bot.answer_callback_query(call.id, f"Xatolik: {e}")
 
-def run_bot():
+def main():
     print("Bot ishga tushdi...")
     bot.infinity_polling()
 
 if __name__ == "__main__":
-    run_bot()
+    main()
