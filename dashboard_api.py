@@ -30,6 +30,31 @@ def update_tender_status(tender_id: int, payload: StatusUpdate):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE tenders SET status=? WHERE id=?", (payload.status, tender_id))
+    
+    # Notify Telegram group if applicable
+    cursor.execute("SELECT title, link, group_message_id FROM tenders WHERE id=?", (tender_id,))
+    tender = cursor.fetchone()
+    if tender:
+        title, link, msg_id = tender
+        cursor.execute("SELECT value FROM settings WHERE key='group_id'")
+        group_row = cursor.fetchone()
+        if group_row and msg_id:
+            group_id = int(group_row[0])
+            import os
+            import telebot
+            from dotenv import load_dotenv
+            load_dotenv()
+            bot_token = os.getenv("BOT_TOKEN")
+            if bot_token:
+                bot = telebot.TeleBot(bot_token)
+                try:
+                    if payload.status == "rejected":
+                        bot.send_message(group_id, f"❌ <b>RAD ETILDI:</b>\n<a href='{link}'>{title}</a>", parse_mode="HTML", reply_to_message_id=msg_id)
+                    elif payload.status == "played":
+                        bot.send_message(group_id, f"✅ <b>O'YNALMOQDA (O'ynash so'rovi):</b>\n<a href='{link}'>{title}</a>", parse_mode="HTML", reply_to_message_id=msg_id)
+                except Exception as e:
+                    print("Telegram notification error:", e)
+                    
     conn.commit()
     conn.close()
     return {"success": True, "status": payload.status}
@@ -43,15 +68,15 @@ def get_stats():
     cursor.execute("SELECT COUNT(*) FROM tenders WHERE date(created_at) = date('now', 'localtime') AND status != 'rejected'")
     today_count = cursor.fetchone()[0]
     
-    # 1 kun qoldi (Shoshilinch: deadline hozirdan boshlab 24 soat ichida)
+    # 1 kun qoldi
     cursor.execute("SELECT COUNT(*) FROM tenders WHERE deadline > datetime('now', 'localtime') AND deadline <= datetime('now', '+24 hours', 'localtime') AND status != 'rejected'")
     urgent_count = cursor.fetchone()[0]
     
-    # Uzoqroq (deadline 24 soatdan uzoq)
+    # Uzoqroq
     cursor.execute("SELECT COUNT(*) FROM tenders WHERE deadline > datetime('now', '+24 hours', 'localtime') AND status != 'rejected'")
     far_count = cursor.fetchone()[0]
     
-    # Arxiv (Muddati o'tganlar yoki Rad etilganlar)
+    # Arxiv
     cursor.execute("SELECT COUNT(*) FROM tenders WHERE deadline <= datetime('now', 'localtime') OR status = 'rejected'")
     archive_count = cursor.fetchone()[0]
     
