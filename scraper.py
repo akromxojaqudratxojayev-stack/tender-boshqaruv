@@ -70,8 +70,20 @@ async def parse_tender(url: str):
         
     # Playwright orqali o'qish (ko'rinmas brauzer) barcha saytlar uchun
     try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
+                async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process',
+                    '--disable-gpu'
+                ]
+            )
             context = await browser.new_context(locale="uz-UZ")
             page = await context.new_page()
             
