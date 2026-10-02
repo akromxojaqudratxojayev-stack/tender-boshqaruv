@@ -72,13 +72,14 @@ def handle_link(message):
         
         tender_id = cursor.lastrowid
         
+        delivery = data.get('delivery_term', "Noma'lum")
         result_text = (
             f"✅ <b>Yangi tender tizimga qo'shildi!</b>\n\n"
             f"📌 <b>Lot nomi:</b> {data['title']}\n"
             f"🏢 <b>Tashkilot:</b> {data['company_name']}\n"
             f"💰 <b>Jami summa:</b> {data['total_sum']}\n"
             f"🔒 <b>Zakalat:</b> {data['deposit_sum']}\n"
-            f"🚚 <b>Yetkazib berish muddati:</b> {data.get('delivery_term', \"Noma'lum\")}\n"
+            f"🚚 <b>Yetkazib berish muddati:</b> {delivery}\n"
             f"📅 <b>Boshlanish:</b> {data['start_date'].strftime('%Y-%m-%d %H:%M')}\n"
             f"⏳ <b>Tugash vaqti:</b> {data['deadline'].strftime('%Y-%m-%d %H:%M')}\n"
             f"🔗 <b>Havola:</b> {data['link']}"
@@ -147,14 +148,14 @@ def process_update(call):
         # O'chirish: yangi tender sifatida eslatmalar boshidan boshlanishi uchun
         cursor.execute("DELETE FROM user_tender_mutes WHERE tender_id=?", (tender_id,))
         conn.commit()
-        
+        delivery = data.get('delivery_term', "Noma'lum")
         result_text = (
             f"🔄 <b>Tender ma'lumotlari yangilandi!</b>\n\n"
             f"📌 <b>Lot nomi:</b> {data['title']}\n"
             f"🏢 <b>Tashkilot:</b> {data['company_name']}\n"
             f"💰 <b>Jami summa:</b> {data['total_sum']}\n"
             f"🔒 <b>Zakalat:</b> {data['deposit_sum']}\n"
-            f"🚚 <b>Yetkazib berish muddati:</b> {data.get('delivery_term', \"Noma'lum\")}\n"
+            f"🚚 <b>Yetkazib berish muddati:</b> {delivery}\n"
             f"📅 <b>Boshlanish:</b> {data['start_date'].strftime('%Y-%m-%d %H:%M')}\n"
             f"⏳ <b>Tugash vaqti:</b> {data['deadline'].strftime('%Y-%m-%d %H:%M')}\n"
             f"🔗 <b>Havola:</b> {data['link']}"
