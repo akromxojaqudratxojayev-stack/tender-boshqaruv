@@ -2,28 +2,29 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import sqlite3
 import os
+from database import get_connection
 
 app = FastAPI(title="Tender VIP Dashboard API")
-
-DB_PATH = "tendir.db"
 
 class StatusUpdate(BaseModel):
     status: str
 
-def get_connection():
-    return sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
-
 @app.get("/api/tenders")
 def get_tenders():
     conn = get_connection()
-    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM tenders ORDER BY id DESC")
     rows = cursor.fetchall()
+    
+    # Map rows to dict
+    columns = ["id", "link", "title", "deadline", "source_site", "created_at", "start_date", "total_sum", "deposit_sum", "company_name", "delivery_term", "group_message_id", "status", "is_started_notified"]
+    
+    results = []
+    for row in rows:
+        results.append(dict(zip(columns, row)))
     conn.close()
-    return [dict(row) for row in rows]
+    return results
 
 @app.put("/api/tenders/{tender_id}/status")
 def update_tender_status(tender_id: int, payload: StatusUpdate):
@@ -35,7 +36,9 @@ def update_tender_status(tender_id: int, payload: StatusUpdate):
     cursor.execute("SELECT title, link, group_message_id FROM tenders WHERE id=?", (tender_id,))
     tender = cursor.fetchone()
     if tender:
-        title, link, msg_id = tender
+        title = tender[0]
+        link = tender[1]
+        msg_id = tender[2]
         cursor.execute("SELECT value FROM settings WHERE key='group_id'")
         group_row = cursor.fetchone()
         if group_row and msg_id:
@@ -64,20 +67,17 @@ def get_stats():
     conn = get_connection()
     cursor = conn.cursor()
     
-    # Bugun qo'shilganlar
-    cursor.execute("SELECT COUNT(*) FROM tenders WHERE date(created_at) = date('now', 'localtime') AND status != 'rejected'")
+    # PostgreSQL queries
+    cursor.execute("SELECT COUNT(*) FROM tenders WHERE DATE(created_at) = CURRENT_DATE AND status != 'rejected'")
     today_count = cursor.fetchone()[0]
     
-    # 1 kun qoldi
-    cursor.execute("SELECT COUNT(*) FROM tenders WHERE deadline > datetime('now', 'localtime') AND deadline <= datetime('now', '+24 hours', 'localtime') AND status != 'rejected'")
+    cursor.execute("SELECT COUNT(*) FROM tenders WHERE deadline > CURRENT_TIMESTAMP AND deadline <= CURRENT_TIMESTAMP + INTERVAL '24 hours' AND status != 'rejected'")
     urgent_count = cursor.fetchone()[0]
     
-    # Uzoqroq
-    cursor.execute("SELECT COUNT(*) FROM tenders WHERE deadline > datetime('now', '+24 hours', 'localtime') AND status != 'rejected'")
+    cursor.execute("SELECT COUNT(*) FROM tenders WHERE deadline > CURRENT_TIMESTAMP + INTERVAL '24 hours' AND status != 'rejected'")
     far_count = cursor.fetchone()[0]
     
-    # Arxiv
-    cursor.execute("SELECT COUNT(*) FROM tenders WHERE deadline <= datetime('now', 'localtime') OR status = 'rejected'")
+    cursor.execute("SELECT COUNT(*) FROM tenders WHERE deadline <= CURRENT_TIMESTAMP OR status = 'rejected'")
     archive_count = cursor.fetchone()[0]
     
     conn.close()
