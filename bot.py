@@ -1,4 +1,5 @@
 import os
+import re
 import telebot
 from telebot import types
 from dotenv import load_dotenv
@@ -80,32 +81,32 @@ def handle_link(message):
         
     conn.close()
 
-def build_tender_text(data, is_update=False):
-    title_prefix = "🔄 <b>Tender ma'lumotlari yangilandi!</b>" if is_update else "✅ <b>Yangi tender tizimga qo'shildi!</b>"
+def build_tender_text(data, tender_id, is_update=False):
+    lot_match = re.search(r'/(\d+)$', data['link'])
+    lot_num = lot_match.group(1) if lot_match else "Noma'lum"
+    
     items_str = data.get('items_str', '')
-    delivery = data.get('delivery_term', "Noma'lum")
-    return (
-        f"{title_prefix}\n\n"
-        f"📌 <b>Lot nomi:</b> {data['title']}\n"
-        f"🏢 <b>Tashkilot:</b> {data['company_name']}\n"
-        f"💰 <b>Jami summa:</b> {data['total_sum']}\n"
-        f"🔒 <b>Zakalat:</b> {data['deposit_sum']}\n"
-        f"🚚 <b>Yetkazib berish muddati:</b> {delivery}\n"
-        f"📅 <b>Boshlanish:</b> {data['start_date'].strftime('%Y-%m-%d %H:%M')}\n"
-        f"⏳ <b>Tugash vaqti:</b> {data['deadline'].strftime('%Y-%m-%d %H:%M')}\n"
-        f"{items_str}\n\n"
-        f"🔗 <b>Havola:</b> {data['link']}"
-    )
+    
+    text = f"Tender #{tender_id} · lot {lot_num}\n\n"
+    text += f"📌 {data['title']}\n"
+    text += f"🏛 {data['company_name']}\n"
+    text += f"💰 {data['total_sum']}\n"
+    text += f"⏳ Muddat: {data['deadline'].strftime('%d.%m.%Y %H:%M')}\n\n"
+    
+    if items_str:
+        text += f"{items_str}\n\n"
+        
+    text += f"🔗 {data['link']}"
+    
+    return text
 
 def build_group_markup(tender_id):
     markup = types.InlineKeyboardMarkup()
     # "O'ynash" - Play
     markup.add(
-        types.InlineKeyboardButton(text="🎮 O'ynaldi", callback_data=f"play_{tender_id}"),
-        types.InlineKeyboardButton(text="❌ Rad qilish", callback_data=f"reject_{tender_id}")
+        types.InlineKeyboardButton(text="🎮 O'ynash", callback_data=f"play_{tender_id}"),
+        types.InlineKeyboardButton(text="❌ Bekor qilish", callback_data=f"reject_{tender_id}")
     )
-    # Mute button
-    markup.add(types.InlineKeyboardButton(text="🔕 Men uchun o'chirish", callback_data=f"mute_{tender_id}"))
     return markup
 
 def send_tender_to_group(tender_id, data, msg, is_update=False):
@@ -114,7 +115,7 @@ def send_tender_to_group(tender_id, data, msg, is_update=False):
     cursor.execute("SELECT value FROM settings WHERE key='group_id'")
     group_row = cursor.fetchone()
     
-    result_text = build_tender_text(data, is_update)
+    result_text = build_tender_text(data, tender_id, is_update)
     markup = build_group_markup(tender_id)
     
     if group_row:
@@ -180,41 +181,32 @@ def handle_update(call):
     send_tender_to_group(tender_id, data, call.message, is_update=True)
     conn.close()
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('mute_'))
-def handle_mute(call):
-    tender_id = call.data.split('_')[1]
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM user_tender_mutes WHERE user_telegram_id=? AND tender_id=?", (call.from_user.id, tender_id))
-    if not cursor.fetchone():
-        cursor.execute("INSERT INTO user_tender_mutes (user_telegram_id, tender_id) VALUES (?, ?)", (call.from_user.id, tender_id))
-        conn.commit()
-        bot.answer_callback_query(call.id, "Siz uchun ushbu tender bo'yicha eslatmalar o'chirildi! 🔕", show_alert=True)
-    else:
-        bot.answer_callback_query(call.id, "Siz bu tenderni allaqachon o'chirgansiz.", show_alert=True)
-    conn.close()
-
 @bot.callback_query_handler(func=lambda call: call.data.startswith('play_'))
 def handle_play(call):
     tender_id = call.data.split('_')[1]
-    
-    # Update message text to show it's being played
     try:
-        new_text = call.message.html_text + f"\n\n✅ <b>BU TENDERDA O'YNASH BOSHLANDI</b> ({call.from_user.first_name} tomonidan)"
+        old_text = call.message.html_text
+        old_text = re.sub(r'^(✅ QATNASHAMIZ|❌ RAD ETILDI)\n+', '', old_text)
+        old_text = re.sub(r'\n+👤 Qaror: .*', '', old_text)
+        
+        new_text = f"✅ QATNASHAMIZ\n{old_text}\n\n👤 Qaror: {call.from_user.first_name}"
         bot.edit_message_text(new_text, chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode="HTML", reply_markup=build_group_markup(tender_id), disable_web_page_preview=True)
-        bot.answer_callback_query(call.id, "Tenderda o'ynash holati belgilandi!", show_alert=True)
+        bot.send_message(call.message.chat.id, "Tender hujjatlarini tayyorlashni boshlang.", reply_to_message_id=call.message.message_id)
+        bot.answer_callback_query(call.id, "Siz 'O'ynash' tugmasini bosdingiz!", show_alert=False)
     except Exception as e:
         bot.answer_callback_query(call.id, f"Xatolik: {e}")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('reject_'))
 def handle_reject(call):
     tender_id = call.data.split('_')[1]
-    
     try:
-        new_text = call.message.html_text + f"\n\n❌ <b>TENDER RAD ETILDI</b> ({call.from_user.first_name} tomonidan)"
-        # Remove markup so buttons disappear if rejected
+        old_text = call.message.html_text
+        old_text = re.sub(r'^(✅ QATNASHAMIZ|❌ RAD ETILDI)\n+', '', old_text)
+        old_text = re.sub(r'\n+👤 Qaror: .*', '', old_text)
+        
+        new_text = f"❌ RAD ETILDI\n{old_text}\n\n👤 Qaror: {call.from_user.first_name}"
         bot.edit_message_text(new_text, chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode="HTML", disable_web_page_preview=True)
-        bot.answer_callback_query(call.id, "Tender rad etildi!", show_alert=True)
+        bot.answer_callback_query(call.id, "Tender rad etildi!", show_alert=False)
     except Exception as e:
         bot.answer_callback_query(call.id, f"Xatolik: {e}")
 
