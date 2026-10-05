@@ -3,9 +3,9 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import json
 import re
-from playwright.async_api import async_playwright
+from playwright.sync_api import sync_playwright
 
-async def parse_tender(url: str):
+def parse_tender(url: str):
     url = url.replace("/provider/bid/new/", "/lot/")
     source_site = "noma'lum"
     if "xt-xarid.uz" in url:
@@ -25,8 +25,8 @@ async def parse_tender(url: str):
             tender_id = civil_match.group(1)
             api_url = f"https://apietender.uzex.uz/api/CivilContracts/Get/{tender_id}"
             
-            async with httpx.AsyncClient(verify=False) as client:
-                response = await client.get(api_url)
+            with httpx.Client(verify=False) as client:
+                response = client.get(api_url)
                 if response.status_code == 200:
                     data = response.json()
                     
@@ -81,9 +81,9 @@ async def parse_tender(url: str):
         
     # Playwright orqali o'qish (ko'rinmas brauzer) barcha saytlar uchun
     try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=True, timeout=30000,
                 args=[
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
@@ -95,26 +95,26 @@ async def parse_tender(url: str):
                     '--disable-gpu'
                 ]
             )
-            context = await browser.new_context(locale="uz-UZ")
-            page = await context.new_page()
+            context = browser.new_context(locale="uz-UZ")
+            page = context.new_page()
             
-            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
             
             if "xt-xarid.uz" in url:
-                await page.wait_for_timeout(5000)
+                page.wait_for_timeout(5000)
             
             try:
-                await page.click("text=O'Z", timeout=2000)
-                await page.wait_for_timeout(1000)
+                page.click("text=O'Z", timeout=2000)
+                page.wait_for_timeout(1000)
             except: pass
             
             try:
-                await page.click("text=O'ZBEKCHA", timeout=2000)
-                await page.wait_for_timeout(1000)
+                page.click("text=O'ZBEKCHA", timeout=2000)
+                page.wait_for_timeout(1000)
             except: pass
             
-            page_text = await page.evaluate("document.body.innerText")
-            page_html = await page.content()
+            page_text = page.evaluate("document.body.innerText")
+            page_html = page.content()
             
             title = "Noma'lum lot"
             company = "Noma'lum tashkilot"
@@ -318,11 +318,11 @@ async def parse_tender(url: str):
                     });
                     return res;
                 }'''
-                extracted_items = await page.evaluate(js_extract)
+                extracted_items = page.evaluate(js_extract)
                 if extracted_items:
                     items_str = "\n\n📦 <b>Tovarlar:</b>\n" + "\n".join(extracted_items)
             
-            await browser.close()
+            browser.close()
             
             return {
                 "link": url,

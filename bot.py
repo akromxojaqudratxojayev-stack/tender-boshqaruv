@@ -56,7 +56,7 @@ def handle_link(message):
     
     try:
         with scrape_lock:
-            data = asyncio.run(parse_tender(url))
+            data = parse_tender(url)
     except Exception as e:
         bot.edit_message_text(f"Xatolik yuz berdi: {e}", chat_id=msg.chat.id, message_id=msg.message_id)
         return
