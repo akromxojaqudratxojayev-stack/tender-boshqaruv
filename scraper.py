@@ -5,6 +5,12 @@ import json
 import re
 from playwright.sync_api import sync_playwright
 
+def format_money(val):
+    try:
+        return f"{float(val):,.0f} UZS".replace(',', ' ')
+    except:
+        return f"{val} UZS"
+
 def parse_tender(url: str):
     url = url.replace("/provider/bid/new/", "/lot/")
     source_site = "noma'lum"
@@ -18,72 +24,73 @@ def parse_tender(url: str):
         source_site = "uzex.uz"
         
     delivery_term = "Noma'lum"
+    
+    # 1) ETENDER.UZEX.UZ API
+    if "etender.uzex.uz/lot/" in url or "etender.uzex.uz/civil-detail/" in url:
+        match = re.search(r'/(?:lot|civil-detail)/(\d+)', url)
+        if not match:
+            raise Exception("Tender ID topilmadi")
+        tender_id = match.group(1)
+        api_url = f"https://apietender.uzex.uz/api/common/GetTrade/{tender_id}/0"
         
-    try:
-        civil_match = re.search(r'civil-detail/(\d+)', url)
-        if civil_match:
-            tender_id = civil_match.group(1)
-            api_url = f"https://apietender.uzex.uz/api/CivilContracts/Get/{tender_id}"
+        with httpx.Client(verify=False, timeout=15.0) as client:
+            resp = client.get(api_url)
+            if resp.status_code != 200:
+                raise Exception(f"Sayt API ishlamadi (xato {resp.status_code})")
+            data = resp.json()
             
-            with httpx.Client(verify=False) as client:
-                response = client.get(api_url)
-                if response.status_code == 200:
-                    data = response.json()
-                    
-                    title = data.get('name', 'Noma\'lum lot nomi')
-                    company = data.get('customer_name', 'Noma\'lum tashkilot')
-                    
-                    cost = data.get('cost', 0)
-                    total_sum = f"{cost:,.0f} UZS".replace(',', ' ')
-                    
-                    pledge = data.get('pledge_sum', 0)
-                    deposit_sum = f"{pledge:,.0f} UZS (Zakalat)".replace(',', ' ')
-                    
-                    start_str = data.get('start_date', '')
-                    end_str = data.get('end_date', '')
-                    
-                    js_products = data.get('js_products', '[]')
-                    items_list = []
-                    try:
-                        products = json.loads(js_products)
-                        if isinstance(products, list) and len(products) > 0:
-                            dl = products[0].get('Delivery_Term')
-                            if dl: delivery_term = f"{dl} Kun"
-                            for idx, p in enumerate(products):
-                                p_name = p.get('Product_Name', 'Tovar')
-                                p_qty = p.get('Quantity', 1)
-                                p_unit = p.get('Measure_Name', 'sht')
-                                items_list.append(f"{idx+1}. {p_name} — {p_qty} {p_unit}")
-                    except: pass
-                    
-                    items_str = ""
-                    if items_list:
-                        items_str = "\n\n📦 <b>Tovarlar:</b>\n" + "\n".join(items_list)
-                    
-                    start_date = datetime.strptime(start_str.split('.')[0], "%Y-%m-%dT%H:%M:%S") if start_str else datetime.now()
-                    deadline = datetime.strptime(end_str.split('.')[0], "%Y-%m-%dT%H:%M:%S") if end_str else (datetime.now() + timedelta(days=3))
-                    
-                    return {
-                        "link": url,
-                        "title": title,
-                        "company_name": company,
-                        "total_sum": total_sum,
-                        "deposit_sum": deposit_sum,
-                        "delivery_term": delivery_term,
-                        "start_date": start_date,
-                        "deadline": deadline,
-                        "source_site": source_site,
-                        "items_str": items_str
-                    }
+        title = data.get('addon_description') or data.get('name') or "Noma'lum"
+        company = data.get('customer_name') or "Noma'lum"
+        total_sum = format_money(data.get('start_cost', 0))
+        deposit_sum = format_money(data.get('pledge_value', 0))
         
-    except Exception as e:
-        print("API orqali o'qishda xatolik:", e)
-        
-    # Playwright orqali o'qish (ko'rinmas brauzer) barcha saytlar uchun
+        start_date = datetime.now()
+        deadline = datetime.now() + timedelta(days=5)
+        if data.get('start_date'):
+            start_date = datetime.strptime(data.get('start_date')[:16], "%Y-%m-%dT%H:%M")
+        if data.get('end_date'):
+            deadline = datetime.strptime(data.get('end_date')[:16], "%Y-%m-%dT%H:%M")
+            
+        items_str = ""
+        try:
+            budget_products = json.loads(data.get('budget_products') or '[]')
+            extracted_items = []
+            for i, p in enumerate(budget_products, 1):
+                p_name = p.get('Product_Name', '')
+                qty = p.get('Quantity', '')
+                unit_price = format_money(p.get('Price', 0))
+                total_price = format_money(p.get('Cost', 0))
+                desc = p.get('Description', '')
+                
+                item_text = f"🔹 <b>{i} - {p_name}</b>\n📦 Miqdori: {qty}\n💵 1 dona narxi: {unit_price}\n💰 Jami: {total_price}"
+                if desc:
+                    item_text += f"\n📝 Batafsil: {desc}"
+                extracted_items.append(item_text)
+                
+            if extracted_items:
+                items_str = "\n\n🛒 <b>Tovarlar:</b>\n\n" + "\n\n".join(extracted_items)
+        except Exception as e:
+            print("Products parse xato:", e)
+            
+        return {
+            "link": url,
+            "title": title,
+            "company_name": company,
+            "total_sum": total_sum,
+            "deposit_sum": deposit_sum,
+            "delivery_term": delivery_term,
+            "start_date": start_date,
+            "deadline": deadline,
+            "source_site": source_site,
+            "items_str": items_str
+        }
+
+    # 2) PLAYWRIGHT FOR OTHER SITES
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(
-                headless=True, timeout=30000,
+                headless=True,
+                timeout=30000,
                 args=[
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
@@ -91,121 +98,59 @@ def parse_tender(url: str):
                     '--disable-accelerated-2d-canvas',
                     '--no-first-run',
                     '--no-zygote',
-                    
                     '--disable-gpu'
                 ]
             )
             context = browser.new_context(locale="uz-UZ")
             page = context.new_page()
             
-            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            page.goto(url, wait_until="domcontentloaded", timeout=30000)
             
             if "xt-xarid.uz" in url:
                 page.wait_for_timeout(5000)
-            
-            try:
-                page.click("text=O'Z", timeout=2000)
-                page.wait_for_timeout(1000)
-            except: pass
-            
-            try:
-                page.click("text=O'ZBEKCHA", timeout=2000)
-                page.wait_for_timeout(1000)
-            except: pass
-            
-            page_text = page.evaluate("document.body.innerText")
+                
             page_html = page.content()
             
-            title = "Noma'lum lot"
+            # --- START OLD PARSING CODE ---
+            soup = BeautifulSoup(page_html, 'html.parser')
+            page_text = soup.get_text(separator="\n").strip()
+            page_text = re.sub(r'\n+', '\n', page_text)
+            
+            title = "Noma'lum tender"
             company = "Noma'lum tashkilot"
-            total_sum = "0 UZS"
+            total_sum = "Noma'lum"
             deposit_sum = "0 UZS"
             delivery_term = "Noma'lum"
-            
             start_date = datetime.now()
-            deadline = datetime.now() + timedelta(days=3)
+            deadline = datetime.now() + timedelta(days=5)
+            items_str = ""
             
-            # Xarid.uzex.uz uchun
-            if "xarid.uzex.uz" in url:
-                sum_matches = re.findall(r"Boshlang.*?ich summa\s*([\d\s\xa0]+)", page_text, re.IGNORECASE)
+            if "xt-xarid.uz" in url:
+                sum_matches = re.findall(r"Kutilayotgan narx:\s+([\d\s\.,]+(?:UZS)?)", page_text)
                 if sum_matches:
-                    total_sum = sum_matches[0].strip() + " UZS"
-                
-                cat_matches = re.findall(r"(?:Tovar kategoriyasi|Toifa):\s*(.+?)\n", page_text, re.IGNORECASE)
-                if cat_matches:
-                    title = cat_matches[0].strip()
+                    total_sum = sum_matches[0].strip()
                     
-                del_matches = re.findall(r"muddati[^\d]*(\d+)", page_text, re.IGNORECASE)
-                if del_matches:
-                    delivery_term = f"{del_matches[0].strip()} Kun"
+                title_matches = re.findall(r"(?:Xarid jurnali raqami|Loyiha nomi):\s+(.+)", page_text)
+                if title_matches:
+                    title = title_matches[0].strip()
                     
-                start_matches = re.findall(r"Boshlanish sanasi:\n+(\d{2}\.\d{2}\.\d{4} \d{2}:\d{2})", page_text)
-                if start_matches:
-                    start_date = datetime.strptime(start_matches[0], "%d.%m.%Y %H:%M")
-                    
-                end_matches = re.findall(r"Tugash sanasi:\n+(\d{2}\.\d{2}\.\d{4} \d{2}:\d{2})", page_text)
-                if end_matches:
-                    deadline = datetime.strptime(end_matches[0], "%d.%m.%Y %H:%M")
-                    
-                company = "Buyurtmachi yashiringan (xarid.uzex)"
-                
-            # xt-xarid.uz uchun
-            elif "xt-xarid.uz" in url:
-                title = "Xarid protsedurasi (xt-xarid)"
-                
-                # HTML dan input title orqali Lot nomini izlaymiz
-                name_html = re.findall(r'<input[^>]+name="name"[^>]+title="([^"]+)"', page_html, re.IGNORECASE)
-                if name_html:
-                    title = name_html[0].strip()
-                    
-                # Yetkazib berish muddatini izlaymiz
-                del_html = re.findall(r'<label>[^<]*(?:етказиб бериш муддати|muddat|muddati)[^<]*</label>[^>]*<input[^>]+title="([^"]+)"', page_html, re.IGNORECASE)
-                if del_html:
-                    delivery_term = f"{del_html[0].strip()} Kun"
-                
-                # HTML dan input title orqali summa izlaymiz (Auksion uchun)
-                sum_html = re.findall(r'name="totalcost_clone"[^>]+title="([^"]+)"', page_html)
-                if sum_html:
-                    total_sum = sum_html[0].strip() + " UZS"
-                else:
-                    # Takliflar so'rovi va boshqalar uchun (HTML matni orqali)
-                    import bs4
-                    plain_text = bs4.BeautifulSoup(page_html, 'html.parser').text
-                    # 'narx' yoki 'summa' so'ziga yaqin raqamlarni qidiramiz
-                    val_matches = re.findall(r'(?:нархи|narx|summa|narxi)[^\d]{0,80}?(\d{1,3}(?: \d{3})*(?:\.\d{2})?)\s*(?:UZS|СУМ|сўм|so\'m)', plain_text, re.IGNORECASE)
-                    if val_matches:
-                        # Topilgan summalar ichidan eng kattasini olamiz (Jami summa)
-                        max_val = 0
-                        max_str = "0"
-                        for v in val_matches:
-                            num = float(v.replace(" ", ""))
-                            if num > max_val:
-                                max_val = num
-                                max_str = v
-                        total_sum = max_str + " UZS"
-                        
                 company = "Buyurtmachi (xt-xarid)"
                 
-            # Qolgan standart (etender)
             else:
-                # 1. Jami summa
                 sum_matches = re.findall(r"(?:Jami boshlang.*?narx|Jami summa|Boshlang.*?ich narx)[^\d]*([\d\s,\.]+UZS)", page_text, re.IGNORECASE)
                 if sum_matches:
                     total_sum = sum_matches[0].strip()
                     
-                # 2. Tashkilot nomi
                 org_matches = re.findall(r"Buyurtmachi nomi:\n+(.+?)\n", page_text, re.IGNORECASE)
                 if org_matches:
                     company = org_matches[0].strip()
                     
-                # 3. Lot nomi
                 lot_name_matches = re.findall(r"(?:Lot nomi|Qo.*?shimcha ma.*?lumotlar|Texnik tavsif):\n+(.+?)\n", page_text, re.IGNORECASE)
                 if lot_name_matches:
                     title = lot_name_matches[0].strip()
                     if title == "-":
                         if len(lot_name_matches) > 1: title = lot_name_matches[1].strip()
                     
-                # 4. Zakalat
                 zakalat_matches = re.findall(r"Zakalat(?: summasi| miqdori):\n+(.+?)\n", page_text, re.IGNORECASE)
                 if zakalat_matches:
                     deposit_sum = zakalat_matches[0].strip()
@@ -213,7 +158,6 @@ def parse_tender(url: str):
                     zakalat_matches = re.findall(r"Zakalat:\n+(.+?)\n", page_text, re.IGNORECASE)
                     if zakalat_matches: deposit_sum = zakalat_matches[0].strip()
                     
-                # Foizli zakalatni hisoblash
                 if "%" in deposit_sum and "UZS" in total_sum:
                     try:
                         percent_match = re.search(r"(\d+(?:\.\d+)?)%", deposit_sum)
@@ -227,7 +171,6 @@ def parse_tender(url: str):
                                 deposit_sum = f"{deposit_sum} ≈ {formatted_deposit}"
                     except: pass
                     
-                # 5. Sanalar
                 try:
                     start_matches = re.findall(r"Boshlanish sanasi:\n+(\d{2}-\d{2}-\d{4} \d{2}:\d{2})", page_text)
                     if start_matches:
@@ -243,61 +186,12 @@ def parse_tender(url: str):
                             deadline = datetime.strptime(alt_end[0], "%b %d, %Y")
                 except: pass
                 
-                # 6. Yetkazib berish muddati
                 delivery_matches = re.findall(r"Yetkazib berish muddati\s*(\d+\s*Kun)", page_text, re.IGNORECASE)
                 if not delivery_matches:
                     delivery_matches = re.findall(r"(\d+\s*Kun)", page_text, re.IGNORECASE)
                 if delivery_matches:
                     delivery_term = delivery_matches[0].strip()
             
-            
-            # Extract products for etender.uzex.uz
-            if "etender.uzex.uz" in url:
-                import bs4
-                soup = bs4.BeautifulSoup(page_html, 'html.parser')
-                extracted_items = []
-                for h5 in soup.find_all(['h4', 'h5', 'h6']):
-                    title_elem = h5.get_text(strip=True)
-                    if not re.match(r'^\d+\s*-', title_elem):
-                        continue
-                    section = h5.find_parent('div')
-                    table = None
-                    while section:
-                        table = section.find('table')
-                        if table: break
-                        section = section.find_parent('div')
-                    
-                    if table:
-                        trs = table.find_all('tr')
-                        if len(trs) > 1:
-                            tds = trs[1].find_all('td')
-                            if len(tds) >= 5:
-                                qty = tds[0].text.strip()
-                                unit = tds[1].text.strip()
-                                unit_price = tds[3].text.strip()
-                                total_price = tds[4].text.strip()
-                                
-                                desc = ''
-                                full_text_section = section.get_text()
-                                match = re.search(r"Batafsil ma[’\\'ʼ]lumot:\s*\"?(.+)", full_text_section, re.IGNORECASE | re.DOTALL)
-                                if match:
-                                    desc = match.group(1).strip()
-                                    if desc.endswith('"'): desc = desc[:-1]
-                                
-                                extracted_items.append(f"🔸 <b>{title_elem}</b>\n📦 Miqdori: {qty} {unit}\n💵 1 dona narxi: {unit_price}\n💰 Jami: {total_price}\n📄 Batafsil: {desc}")
-                
-                # Remove duplicates
-                seen = set()
-                deduped = []
-                for item in extracted_items:
-                    if item not in seen:
-                        seen.add(item)
-                        deduped.append(item)
-                
-                if deduped:
-                    items_str = "\n\n🎁 <b>Tovarlar:</b>\n\n" + "\n\n".join(deduped)
-
-            # Extract products for xarid.uzex.uz via JS
             if "xarid.uzex.uz" in url:
                 js_extract = '''() => {
                     let res = [];
@@ -320,7 +214,7 @@ def parse_tender(url: str):
                 }'''
                 extracted_items = page.evaluate(js_extract)
                 if extracted_items:
-                    items_str = "\n\n📦 <b>Tovarlar:</b>\n" + "\n".join(extracted_items)
+                    items_str = "\n\n🛒 <b>Tovarlar:</b>\n" + "\n".join(extracted_items)
             
             browser.close()
             
@@ -339,4 +233,4 @@ def parse_tender(url: str):
             
     except Exception as e:
         print("Playwright bilan xatolik:", e)
-        raise Exception(f"Ma\'lumotlarni o\'qib bo\'lmadi. Xato: {str(e)[:100]}")
+        raise Exception(f"Ma'lumotlarni o'qib bo'lmadi. Xato: {str(e)[:100]}")
