@@ -9,6 +9,9 @@ from dotenv import load_dotenv
 from database import get_connection, init_db
 from scraper import parse_tender
 import asyncio
+import threading
+
+scrape_lock = threading.Lock()
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN", "BU_YERGA_TOKEN_YOZILADI")
@@ -52,7 +55,8 @@ def handle_link(message):
     msg = bot.reply_to(message, "⏳ Havola qabul qilindi! Ma'lumotlar olinmoqda (brauzer tekshirmoqda, ozgina kuting)...")
     
     try:
-        data = asyncio.run(parse_tender(url))
+        with scrape_lock:
+            data = asyncio.run(parse_tender(url))
     except Exception as e:
         bot.edit_message_text(f"Xatolik yuz berdi: {e}", chat_id=msg.chat.id, message_id=msg.message_id)
         return
