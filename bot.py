@@ -1,4 +1,8 @@
 import os
+print("Checking Playwright dependencies...")
+os.system("python -m playwright install chromium")
+
+import os
 import re
 import telebot
 from dotenv import load_dotenv

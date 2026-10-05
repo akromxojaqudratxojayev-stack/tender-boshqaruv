@@ -1,4 +1,8 @@
 import os
+print("Checking Playwright dependencies...")
+os.system("python -m playwright install chromium")
+
+import os
 import threading
 import uvicorn
 from dashboard_api import app
