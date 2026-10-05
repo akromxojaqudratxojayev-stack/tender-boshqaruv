@@ -98,7 +98,7 @@ async def parse_tender(url: str):
             context = await browser.new_context(locale="uz-UZ")
             page = await context.new_page()
             
-            await page.goto(url, wait_until="networkidle", timeout=60000)
+            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
             
             if "xt-xarid.uz" in url:
                 await page.wait_for_timeout(5000)
@@ -253,7 +253,7 @@ async def parse_tender(url: str):
             
             # Extract products for etender.uzex.uz
             if "etender.uzex.uz" in url:
-                import bs4, re
+                import bs4
                 soup = bs4.BeautifulSoup(page_html, 'html.parser')
                 extracted_items = []
                 for h5 in soup.find_all(['h4', 'h5', 'h6']):
@@ -298,7 +298,6 @@ async def parse_tender(url: str):
                     items_str = "\n\n🎁 <b>Tovarlar:</b>\n\n" + "\n\n".join(deduped)
 
             # Extract products for xarid.uzex.uz via JS
-            items_str = ""
             if "xarid.uzex.uz" in url:
                 js_extract = '''() => {
                     let res = [];
