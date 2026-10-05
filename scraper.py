@@ -339,4 +339,4 @@ async def parse_tender(url: str):
             
     except Exception as e:
         print("Playwright bilan xatolik:", e)
-        raise Exception("Ma'lumotlarni o'qib bo'lmadi. Havolani tekshiring yoki keyinroq qayta urinib ko'ring.")
+        raise Exception(f"Ma\'lumotlarni o\'qib bo\'lmadi. Xato: {str(e)[:100]}")
