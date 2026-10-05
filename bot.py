@@ -61,31 +61,36 @@ def handle_link(message):
         bot.edit_message_text(f"Xatolik yuz berdi: {e}", chat_id=msg.chat.id, message_id=msg.message_id)
         return
         
-    conn = get_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT * FROM tenders WHERE link=?", (data['link'],))
-    tender = cursor.fetchone()
-    
-    if not tender:
-        full_text_val = build_tender_text(data, 0)
-        cursor.execute('''INSERT INTO tenders (link, title, deadline, start_date, total_sum, deposit_sum, company_name, delivery_term, source_site, full_text) 
-                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id''',
-                       (data['link'], data['title'], data['deadline'], data['start_date'], 
-                        data['total_sum'], data['deposit_sum'], data['company_name'], data.get('delivery_term', "Noma'lum"), data['source_site'], full_text_val))
-        res = cursor.fetchone()
-        tender_id = res[0] if res else cursor.lastrowid
-        conn.commit()
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
         
-        full_text_val = build_tender_text(data, tender_id)
-        cursor.execute("UPDATE tenders SET full_text=? WHERE id=?", (full_text_val, tender_id))
-        conn.commit()
-        send_tender_to_group(tender_id, data, msg)
-    else:
-        bot.edit_message_text("⚠️ Bu tender oldin tizimga qo'shilgan va bazada mavjud.", 
-                              chat_id=msg.chat.id, message_id=msg.message_id)
+        cursor.execute("SELECT * FROM tenders WHERE link=?", (data['link'],))
+        tender = cursor.fetchone()
         
-    conn.close()
+        if not tender:
+            full_text_val = build_tender_text(data, 0)
+            cursor.execute('''INSERT INTO tenders (link, title, deadline, start_date, total_sum, deposit_sum, company_name, delivery_term, source_site, full_text) 
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id''',
+                           (data['link'], data['title'], data['deadline'], data['start_date'], 
+                            data['total_sum'], data['deposit_sum'], data['company_name'], data.get('delivery_term', "Noma'lum"), data['source_site'], full_text_val))
+            res = cursor.fetchone()
+            tender_id = res[0] if res else cursor.lastrowid
+            conn.commit()
+            
+            full_text_val = build_tender_text(data, tender_id)
+            cursor.execute("UPDATE tenders SET full_text=? WHERE id=?", (full_text_val, tender_id))
+            conn.commit()
+            send_tender_to_group(tender_id, data, msg)
+        else:
+            bot.edit_message_text("⚠️ Bu tender oldin tizimga qo'shilgan va bazada mavjud.", 
+                                  chat_id=msg.chat.id, message_id=msg.message_id)
+            
+        conn.close()
+    except Exception as e:
+        bot.edit_message_text(f"Xatolik (Baza): {e}", chat_id=msg.chat.id, message_id=msg.message_id)
+        if 'conn' in locals():
+            conn.close()
 
 def build_tender_text(data, tender_id, is_update=False):
     lot_match = re.search(r'/(\d+)$', data['link'])

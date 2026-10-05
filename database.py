@@ -99,6 +99,35 @@ def init_db():
             value TEXT
         )
         ''')
+        
+        # Add missing columns for PostgreSQL if they don't exist
+        try: cursor.execute("ALTER TABLE tenders ADD COLUMN start_date TIMESTAMP")
+        except: conn.conn.rollback()
+        
+        try: cursor.execute("ALTER TABLE tenders ADD COLUMN total_sum TEXT")
+        except: conn.conn.rollback()
+        
+        try: cursor.execute("ALTER TABLE tenders ADD COLUMN deposit_sum TEXT")
+        except: conn.conn.rollback()
+        
+        try: cursor.execute("ALTER TABLE tenders ADD COLUMN company_name TEXT")
+        except: conn.conn.rollback()
+        
+        try: cursor.execute("ALTER TABLE tenders ADD COLUMN delivery_term TEXT")
+        except: conn.conn.rollback()
+        
+        try: cursor.execute("ALTER TABLE tenders ADD COLUMN group_message_id BIGINT")
+        except: conn.conn.rollback()
+        
+        try: cursor.execute("ALTER TABLE tenders ADD COLUMN status TEXT DEFAULT 'active'")
+        except: conn.conn.rollback()
+        
+        try: cursor.execute("ALTER TABLE tenders ADD COLUMN is_started_notified BOOLEAN DEFAULT FALSE")
+        except: conn.conn.rollback()
+        
+        try: cursor.execute("ALTER TABLE tenders ADD COLUMN full_text TEXT")
+        except: conn.conn.rollback()
+        
     else:
         # SQLite init
         cursor.execute('''
