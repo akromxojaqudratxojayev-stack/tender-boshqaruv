@@ -98,16 +98,35 @@ def build_tender_text(data, tender_id, is_update=False):
     
     items_str = data.get('items_str', '')
     
-    text = f"Tender #{tender_id} · lot {lot_num}\n\n"
-    text += f"📌 {data['title']}\n"
-    text += f"🏛 {data['company_name']}\n"
-    text += f"💰 {data['total_sum']}\n"
-    text += f"⏳ Muddat: {data['deadline'].strftime('%d.%m.%Y %H:%M')}\n\n"
+    prefix = "🔄 Tender yangilandi!\n\n" if is_update else "✅ Yangi tender tizimga qo'shildi!\n\n"
+    text = f"{prefix}"
+    text += f"📌 <b>Lot nomi:</b> {data['title']}\n"
+    text += f"🏛 <b>Tashkilot:</b> {data['company_name']}\n"
+    text += f"💰 <b>Jami summa:</b> {data['total_sum']}\n"
+    
+    deposit = data.get('deposit_sum', '0 UZS')
+    if deposit and deposit != '0 UZS':
+        text += f"🔒 <b>Zakalat:</b> {deposit}\n"
+        
+    delivery = data.get('delivery_term', "Noma'lum")
+    if delivery and delivery != "Noma'lum":
+        text += f"🚚 <b>Yetkazib berish muddati:</b> {delivery}\n"
+        
+    if data.get('start_date'):
+        try:
+            start_formatted = data['start_date'].strftime('%Y-%m-%d %H:%M')
+            text += f"📅 <b>Boshlanish:</b> {start_formatted}\n"
+        except: pass
+        
+    try:
+        deadline_formatted = data['deadline'].strftime('%Y-%m-%d %H:%M')
+    except:
+        deadline_formatted = str(data['deadline'])
+    text += f"⏳ <b>Tugash vaqti:</b> {deadline_formatted}\n"
+    text += f"🔗 <b>Havola:</b> {data['link']}\n"
     
     if items_str:
-        text += f"{items_str}\n\n"
-        
-    text += f"🔗 {data['link']}"
+        text += f"{items_str}"
     
     return text
 
