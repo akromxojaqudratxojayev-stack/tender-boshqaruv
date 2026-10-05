@@ -33,12 +33,18 @@ def update_tender_status(tender_id: int, payload: StatusUpdate):
     cursor.execute("UPDATE tenders SET status=? WHERE id=?", (payload.status, tender_id))
     
     # Notify Telegram group if applicable
-    cursor.execute("SELECT title, link, group_message_id FROM tenders WHERE id=?", (tender_id,))
+    try:
+        cursor.execute("SELECT title, link, group_message_id, full_text FROM tenders WHERE id=?", (tender_id,))
+    except:
+        cursor.execute("SELECT title, link, group_message_id, NULL FROM tenders WHERE id=?", (tender_id,))
     tender = cursor.fetchone()
+    
     if tender:
         title = tender[0]
         link = tender[1]
         msg_id = tender[2]
+        full_text = tender[3]
+        
         cursor.execute("SELECT value FROM settings WHERE key='group_id'")
         group_row = cursor.fetchone()
         if group_row and msg_id:
@@ -52,9 +58,15 @@ def update_tender_status(tender_id: int, payload: StatusUpdate):
                 bot = telebot.TeleBot(bot_token)
                 try:
                     if payload.status == "rejected":
-                        bot.send_message(group_id, f"❌ <b>RAD ETILDI:</b>\n<a href='{link}'>{title}</a>", parse_mode="HTML", reply_to_message_id=msg_id)
+                        if full_text:
+                            bot.send_message(group_id, f"❌ <b>RAD ETILDI</b>\n\n{full_text}", parse_mode="HTML", reply_to_message_id=msg_id, disable_web_page_preview=True)
+                        else:
+                            bot.send_message(group_id, f"❌ <b>RAD ETILDI</b>\n\n<a href='{link}'>{title}</a>", parse_mode="HTML", reply_to_message_id=msg_id)
                     elif payload.status == "played":
-                        bot.send_message(group_id, f"✅ <b>O'YNALMOQDA (O'ynash so'rovi):</b>\n<a href='{link}'>{title}</a>", parse_mode="HTML", reply_to_message_id=msg_id)
+                        if full_text:
+                            bot.send_message(group_id, f"✅ <b>QATNASHAMIZ</b>\n\n{full_text}\n\n<i>Tender hujjatlarini tayyorlashni boshlang.</i>", parse_mode="HTML", reply_to_message_id=msg_id, disable_web_page_preview=True)
+                        else:
+                            bot.send_message(group_id, f"✅ <b>QATNASHAMIZ</b>\n\n<a href='{link}'>{title}</a>\n\n<i>Tender hujjatlarini tayyorlashni boshlang.</i>", parse_mode="HTML", reply_to_message_id=msg_id)
                 except Exception as e:
                     print("Telegram notification error:", e)
                     

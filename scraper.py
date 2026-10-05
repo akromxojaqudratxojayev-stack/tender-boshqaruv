@@ -250,6 +250,53 @@ async def parse_tender(url: str):
                 if delivery_matches:
                     delivery_term = delivery_matches[0].strip()
             
+            
+            # Extract products for etender.uzex.uz
+            if "etender.uzex.uz" in url:
+                import bs4, re
+                soup = bs4.BeautifulSoup(page_html, 'html.parser')
+                extracted_items = []
+                for h5 in soup.find_all(['h4', 'h5', 'h6']):
+                    title_elem = h5.get_text(strip=True)
+                    if not re.match(r'^\d+\s*-', title_elem):
+                        continue
+                    section = h5.find_parent('div')
+                    table = None
+                    while section:
+                        table = section.find('table')
+                        if table: break
+                        section = section.find_parent('div')
+                    
+                    if table:
+                        trs = table.find_all('tr')
+                        if len(trs) > 1:
+                            tds = trs[1].find_all('td')
+                            if len(tds) >= 5:
+                                qty = tds[0].text.strip()
+                                unit = tds[1].text.strip()
+                                unit_price = tds[3].text.strip()
+                                total_price = tds[4].text.strip()
+                                
+                                desc = ''
+                                full_text_section = section.get_text()
+                                match = re.search(r"Batafsil ma[’\\'ʼ]lumot:\s*\"?(.+)", full_text_section, re.IGNORECASE | re.DOTALL)
+                                if match:
+                                    desc = match.group(1).strip()
+                                    if desc.endswith('"'): desc = desc[:-1]
+                                
+                                extracted_items.append(f"🔸 <b>{title_elem}</b>\n📦 Miqdori: {qty} {unit}\n💵 1 dona narxi: {unit_price}\n💰 Jami: {total_price}\n📄 Batafsil: {desc}")
+                
+                # Remove duplicates
+                seen = set()
+                deduped = []
+                for item in extracted_items:
+                    if item not in seen:
+                        seen.add(item)
+                        deduped.append(item)
+                
+                if deduped:
+                    items_str = "\n\n🎁 <b>Tovarlar:</b>\n\n" + "\n\n".join(deduped)
+
             # Extract products for xarid.uzex.uz via JS
             items_str = ""
             if "xarid.uzex.uz" in url:
@@ -293,19 +340,4 @@ async def parse_tender(url: str):
             
     except Exception as e:
         print("Playwright bilan xatolik:", e)
-        pass
-        
-    dummy_deadline = datetime.now() + timedelta(days=2, hours=5)
-    dummy_start = datetime.now() - timedelta(days=1)
-    
-    return {
-        "link": url,
-        "title": "Kechirasiz, ma'lumotni to'g'ridan-to'g'ri o'qib bo'lmadi",
-        "company_name": "Tashkilot nomi yashiringan",
-        "total_sum": "0 UZS",
-        "deposit_sum": "0 UZS",
-        "delivery_term": "Noma'lum",
-        "start_date": dummy_start,
-        "deadline": dummy_deadline,
-        "source_site": source_site
-    }
+        raise Exception("Ma'lumotlarni o'qib bo'lmadi. Havolani tekshiring yoki keyinroq qayta urinib ko'ring.")

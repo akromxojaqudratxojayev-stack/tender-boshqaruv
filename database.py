@@ -80,6 +80,7 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             group_message_id BIGINT,
             status TEXT DEFAULT 'active',
+            full_text TEXT,
             is_started_notified BOOLEAN DEFAULT FALSE
         )
         ''')
@@ -124,6 +125,7 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             group_message_id INTEGER,
             status TEXT DEFAULT 'active',
+            full_text TEXT,
             is_started_notified BOOLEAN DEFAULT 0
         )
         ''')
@@ -143,6 +145,8 @@ def init_db():
         try: cursor.execute("ALTER TABLE tenders ADD COLUMN status TEXT DEFAULT 'active'")
         except: pass
         try: cursor.execute("ALTER TABLE tenders ADD COLUMN is_started_notified BOOLEAN DEFAULT 0")
+        except: pass
+        try: cursor.execute("ALTER TABLE tenders ADD COLUMN full_text TEXT")
         except: pass
         
         cursor.execute('''

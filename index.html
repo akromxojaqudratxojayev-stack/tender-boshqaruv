@@ -167,9 +167,10 @@
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-100">
-                            <tr v-for="t in filteredTenders" :key="t.id" 
-                                class="hover:bg-slate-50 transition-colors" 
-                                :class="{'bg-rose-50/30 hover:bg-rose-50/60': isUrgent(t.deadline) && t.status === 'active', 'opacity-70': t.status === 'rejected' || isExpired(t.deadline)}">
+                            <template v-for="t in filteredTenders" :key="t.id">
+                            <tr @click="toggleExpand(t.id)"
+                                class="hover:bg-slate-50 transition-colors cursor-pointer" 
+                                :class="{'bg-rose-50/30 hover:bg-rose-50/60': isUrgent(t.deadline) && t.status === 'active', 'opacity-70': t.status === 'rejected' || isExpired(t.deadline), 'bg-blue-50/50': expandedTender === t.id}">
                                 
                                 <td class="px-6 py-4 whitespace-normal">
                                     <div class="text-sm font-semibold text-gray-900 leading-tight mb-1">{{ t.title }}</div>
@@ -205,7 +206,7 @@
                                     </div>
                                 </td>
                                 
-                                <td class="px-6 py-4 whitespace-nowrap text-center">
+                                <td class="px-6 py-4 whitespace-nowrap text-center" @click.stop>
                                     <div class="flex flex-col gap-1.5 items-center w-28 mx-auto">
                                         <a :href="t.link" target="_blank" class="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 px-3 py-1.5 rounded-lg shadow-sm transition">
                                             Ko'rish <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
@@ -238,6 +239,13 @@
                                     </div>
                                 </td>
                             </tr>
+                            <tr v-if="expandedTender === t.id" class="bg-slate-50 border-b border-gray-200">
+                                <td colspan="5" class="px-6 py-4">
+                                    <div class="p-4 bg-white rounded-xl border border-slate-200 shadow-sm text-sm text-gray-700 whitespace-pre-wrap font-mono leading-relaxed" style="max-height: 500px; overflow-y: auto;" v-html="formatFullText(t.full_text)">
+                                    </div>
+                                </td>
+                            </tr>
+                            </template>
                             <tr v-if="filteredTenders.length === 0">
                                 <td colspan="5" class="px-6 py-16 text-center">
                                     <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 text-slate-400 mb-4">
@@ -247,6 +255,13 @@
                                     <p class="text-sm text-slate-500">Ushbu bo'limda hozircha tenderlar yo'q.</p>
                                 </td>
                             </tr>
+                            <tr v-if="expandedTender === t.id" class="bg-slate-50 border-b border-gray-200">
+                                <td colspan="5" class="px-6 py-4">
+                                    <div class="p-4 bg-white rounded-xl border border-slate-200 shadow-sm text-sm text-gray-700 whitespace-pre-wrap font-mono leading-relaxed" style="max-height: 500px; overflow-y: auto;" v-html="formatFullText(t.full_text)">
+                                    </div>
+                                </td>
+                            </tr>
+                            </template>
                         </tbody>
                     </table>
                 </div>
@@ -271,6 +286,7 @@
                     stats: {},
                     searchTender: '',
                     filterType: 'all',
+                    expandedTender: null,
                     currentTime: '',
                     currentDate: '',
                     keyBuffer: '' // For "qayt eskiga" secret code
@@ -314,6 +330,11 @@
                         console.error("Yuklash xatosi:", e);
                     }
                 },
+                formatFullText(text) {
+                    if (!text) return 'To\'liq ma\'lumot mavjud emas (yoki hali yuklanmagan).';
+                    let formatted = text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" class="text-blue-600 hover:underline">$1</a>');
+                    return formatted;
+                },
                 formatDate(dateString) {
                     if (!dateString) return 'Noma\'lum';
                     const d = new Date(dateString);
@@ -343,6 +364,9 @@
                     } catch (e) {
                         console.error("Xatolik:", e);
                     }
+                },
+                toggleExpand(id) {
+                    this.expandedTender = this.expandedTender === id ? null : id;
                 },
                 updateClock() {
                     const now = new Date();
