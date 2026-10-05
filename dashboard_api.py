@@ -17,12 +17,7 @@ def get_tenders():
     cursor.execute("SELECT * FROM tenders ORDER BY id DESC")
     rows = cursor.fetchall()
     
-    # Map rows to dict
-    columns = ["id", "link", "title", "deadline", "source_site", "created_at", "start_date", "total_sum", "deposit_sum", "company_name", "delivery_term", "group_message_id", "status", "is_started_notified"]
-    
-    results = []
-    for row in rows:
-        results.append(dict(zip(columns, row)))
+    results = [dict(row) for row in rows]
     conn.close()
     return results
 
@@ -104,3 +99,8 @@ def serve_dashboard():
 def serve_old_dashboard():
     with open("dashboard_ui/old_index.html", "r", encoding="utf-8") as f:
         return f.read()
+
+@app.get("/debug")
+def debug():
+    import os
+    return {"cmd": os.popen("ps aux").read()}

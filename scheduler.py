@@ -38,7 +38,7 @@ def check_tenders():
     cursor.execute("SELECT id, link, title, deadline, total_sum, company_name, delivery_term, status, is_started_notified FROM tenders WHERE status IN ('active', 'played')")
     tenders = cursor.fetchall()
     
-    cursor.execute("SELECT telegram_id FROM users WHERE is_active=1")
+    cursor.execute("SELECT telegram_id FROM users WHERE is_active=1 OR is_active=true")
     users = cursor.fetchall()
     
     for tender in tenders:
