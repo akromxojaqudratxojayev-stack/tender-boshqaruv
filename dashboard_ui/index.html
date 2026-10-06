@@ -352,6 +352,14 @@
                     const d = new Date(dateString);
                     return d.toLocaleDateString('uz-UZ') + ' ' + d.toLocaleTimeString('uz-UZ', {hour: '2-digit', minute:'2-digit'});
                 },
+                isToday(dateString) {
+                    if (!dateString) return false;
+                    const d = new Date(dateString);
+                    const today = new Date();
+                    return d.getDate() === today.getDate() && 
+                           d.getMonth() === today.getMonth() && 
+                           d.getFullYear() === today.getFullYear();
+                },
                 isUrgent(dateString) {
                     if (!dateString) return false;
                     const diff = new Date(dateString) - new Date();
