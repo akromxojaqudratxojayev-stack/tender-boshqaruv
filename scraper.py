@@ -18,6 +18,8 @@ def parse_tender(url: str):
         source_site = "xt-xarid.uz"
     elif "tender.mc.uz" in url:
         source_site = "tender.mc.uz"
+    elif "etender.uzex.uz" in url:
+        source_site = "etender.uzex.uz"
     elif "xarid.uzex.uz" in url:
         source_site = "xarid.uzex.uz"
     elif "uzex.uz" in url:
@@ -41,8 +43,16 @@ def parse_tender(url: str):
             
         title = data.get('addon_description') or data.get('name') or "Noma'lum"
         company = data.get('customer_name') or "Noma'lum"
-        total_sum = format_money(data.get('start_cost', 0))
-        deposit_sum = format_money(data.get('pledge_value', 0))
+        
+        start_cost = data.get('start_cost', 0)
+        total_sum = format_money(start_cost)
+        
+        pledge_val = data.get('pledge_value', 0)
+        if pledge_val and start_cost:
+            deposit_amount = (start_cost * pledge_val) / 100
+            deposit_sum = f"{pledge_val}% — {format_money(deposit_amount)}"
+        else:
+            deposit_sum = "0 UZS"
         
         start_date = datetime.now()
         deadline = datetime.now() + timedelta(days=5)
@@ -52,8 +62,15 @@ def parse_tender(url: str):
             deadline = datetime.strptime(data.get('end_date')[:16], "%Y-%m-%dT%H:%M")
             
         items_str = ""
+        delivery_term = "Noma'lum"
         try:
             budget_products = json.loads(data.get('budget_products') or '[]')
+            
+            if budget_products and isinstance(budget_products, list):
+                days = budget_products[0].get('Delivery_Term')
+                if days:
+                    delivery_term = f"{days} Kun"
+            
             extracted_items = []
             for i, p in enumerate(budget_products, 1):
                 p_name = p.get('Product_Name', '')
