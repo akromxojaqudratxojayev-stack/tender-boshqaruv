@@ -135,3 +135,13 @@ def update_reminders_setting(payload: ToggleReminder):
     conn.commit()
     conn.close()
     return {"reminders_enabled": payload.enabled}
+
+
+@app.get('/api/clear-db')
+def clear_db():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM tenders')
+    conn.commit()
+    conn.close()
+    return {'status': 'success', 'message': 'Barcha ma\'lumotlar tozalandi!'}
