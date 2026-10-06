@@ -78,13 +78,13 @@ def get_stats():
     cursor.execute("SELECT COUNT(*) FROM tenders WHERE DATE(created_at) = CURRENT_DATE AND status != 'rejected'")
     today_count = cursor.fetchone()[0]
     
-    cursor.execute("SELECT COUNT(*) FROM tenders WHERE deadline > CURRENT_TIMESTAMP AND deadline <= CURRENT_TIMESTAMP + INTERVAL '24 hours' AND status != 'rejected'")
+    cursor.execute("SELECT COUNT(*) FROM tenders WHERE deadline > CURRENT_TIMESTAMP AND deadline <= CURRENT_TIMESTAMP + INTERVAL '24 hours' AND status != 'rejected' AND DATE(created_at) != CURRENT_DATE")
     urgent_count = cursor.fetchone()[0]
     
-    cursor.execute("SELECT COUNT(*) FROM tenders WHERE deadline > CURRENT_TIMESTAMP + INTERVAL '24 hours' AND status != 'rejected'")
+    cursor.execute("SELECT COUNT(*) FROM tenders WHERE deadline > CURRENT_TIMESTAMP + INTERVAL '24 hours' AND status != 'rejected' AND DATE(created_at) != CURRENT_DATE")
     far_count = cursor.fetchone()[0]
     
-    cursor.execute("SELECT COUNT(*) FROM tenders WHERE deadline <= CURRENT_TIMESTAMP OR status = 'rejected'")
+    cursor.execute("SELECT COUNT(*) FROM tenders WHERE (deadline <= CURRENT_TIMESTAMP OR status = 'rejected')")
     archive_count = cursor.fetchone()[0]
     
     conn.close()
