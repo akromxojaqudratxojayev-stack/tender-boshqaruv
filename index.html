@@ -55,10 +55,10 @@
                     
                     <div class="flex items-center gap-6">
                         <!-- Notification Hint (Small) -->
-                        <div class="hidden md:flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full text-xs text-slate-600 cursor-help" title="Bot Eslatmalari: 2 kun qolganda (1x), 1 kun qolganda (2x), oxirgi 12 soatda (4x)">
-                            <i class="fa-solid fa-bell text-amber-500"></i>
-                            <span class="font-medium">Eslatmalar: Yoqilgan</span>
-                        </div>
+                        <button @click="toggleReminders" class="hidden md:flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full text-xs cursor-pointer hover:bg-slate-100 transition-colors shadow-sm" :class="remindersEnabled ? 'text-slate-700' : 'text-slate-400'" :title="remindersEnabled ? 'Bot Eslatmalari yoniq. O\'chirish uchun bosing' : 'Bot Eslatmalari o\'chiq. Yoqish uchun bosing'">
+                            <i class="fa-solid fa-bell" :class="remindersEnabled ? 'text-amber-500' : 'text-slate-400'"></i>
+                            <span class="font-medium" v-text="remindersEnabled ? 'Eslatmalar: Yoqilgan' : 'Eslatmalar: O\'chirilgan'"></span>
+                        </button>
                         
                         <!-- Live Clock -->
                         <div class="flex flex-col items-end">
@@ -289,7 +289,8 @@
                     expandedTender: null,
                     currentTime: '',
                     currentDate: '',
-                    keyBuffer: '' // For "qayt eskiga" secret code
+                    keyBuffer: '', // For "qayt eskiga" secret code
+                    remindersEnabled: true
                 }
             },
             computed: {
@@ -320,14 +321,31 @@
             methods: {
                 async fetchData() {
                     try {
-                        const [resTenders, resStats] = await Promise.all([
+                        const [resTenders, resStats, resSettings] = await Promise.all([
                             fetch('/api/tenders'),
-                            fetch('/api/stats')
+                            fetch('/api/stats'),
+                            fetch('/api/settings/reminders')
                         ]);
                         this.tenders = await resTenders.json();
                         this.stats = await resStats.json();
+                        if (resSettings.ok) {
+                            const settings = await resSettings.json();
+                            this.remindersEnabled = settings.reminders_enabled;
+                        }
                     } catch (e) {
                         console.error("Yuklash xatosi:", e);
+                    }
+                },
+                async toggleReminders() {
+                    this.remindersEnabled = !this.remindersEnabled;
+                    try {
+                        await fetch('/api/settings/reminders', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ enabled: this.remindersEnabled })
+                        });
+                    } catch (e) {
+                        console.error(e);
                     }
                 },
                 formatFullText(text) {

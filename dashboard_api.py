@@ -104,3 +104,34 @@ def serve_old_dashboard():
 def debug():
     import os
     return {"cmd": os.popen("ps aux").read()}
+
+class ToggleReminder(BaseModel):
+    enabled: bool
+
+@app.get("/api/settings/reminders")
+def get_reminders_setting():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM settings WHERE key='reminders_enabled'")
+    row = cursor.fetchone()
+    conn.close()
+    
+    is_enabled = True if not row else (str(row[0]) == '1' or str(row[0]).lower() == 'true')
+    return {"reminders_enabled": is_enabled}
+
+@app.put("/api/settings/reminders")
+def update_reminders_setting(payload: ToggleReminder):
+    conn = get_connection()
+    cursor = conn.cursor()
+    val = '1' if payload.enabled else '0'
+    
+    cursor.execute("SELECT value FROM settings WHERE key='reminders_enabled'")
+    exists = cursor.fetchone()
+    if exists:
+        cursor.execute("UPDATE settings SET value=? WHERE key='reminders_enabled'", (val,))
+    else:
+        cursor.execute("INSERT INTO settings (key, value) VALUES ('reminders_enabled', ?)", (val,))
+        
+    conn.commit()
+    conn.close()
+    return {"reminders_enabled": payload.enabled}

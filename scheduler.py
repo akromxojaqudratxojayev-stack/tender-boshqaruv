@@ -41,6 +41,10 @@ def check_tenders():
     cursor.execute("SELECT telegram_id FROM users WHERE is_active=1 OR is_active=true")
     users = cursor.fetchall()
     
+    cursor.execute("SELECT value FROM settings WHERE key='reminders_enabled'")
+    setting_row = cursor.fetchone()
+    global_reminders = True if not setting_row else (str(setting_row[0]) == '1' or str(setting_row[0]).lower() == 'true')
+    
     for tender in tenders:
         tender_id, link, title, deadline_str, total_sum, company, delivery_term, status, is_started_notified = tender
         try:
@@ -74,7 +78,7 @@ def check_tenders():
             continue # played status uchun normal eslatmalar ketmaydi
             
         # 2. "ACTIVE" logikasi: normal eslatmalar
-        if status == 'active' and deadline > now:
+        if status == 'active' and deadline > now and global_reminders:
             should_remind, text = calculate_reminders(deadline)
             if should_remind:
                 for user in users:
