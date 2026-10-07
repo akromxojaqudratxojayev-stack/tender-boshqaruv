@@ -145,3 +145,23 @@ def clear_db():
     conn.commit()
     conn.close()
     return {'status': 'success', 'message': 'Barcha ma\'lumotlar tozalandi!'}
+
+
+from fastapi.responses import FileResponse
+
+@app.get("/manifest.json")
+def serve_manifest():
+    return FileResponse("dashboard_ui/manifest.json")
+
+@app.get("/sw.js")
+def serve_sw():
+    return FileResponse("dashboard_ui/sw.js")
+
+@app.get("/icon-192.png")
+def serve_icon192():
+    return FileResponse("dashboard_ui/icon-192.png")
+
+@app.get("/icon-512.png")
+def serve_icon512():
+    return FileResponse("dashboard_ui/icon-512.png")
+
