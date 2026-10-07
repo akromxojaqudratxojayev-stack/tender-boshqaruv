@@ -461,13 +461,35 @@
     }
 
     let deferredPrompt;
+    
+    // Detect iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    
+    let installBtn = document.getElementById('install-btn');
+    
+    // Show button for iOS if not already installed
+    if (isIOS && !isStandalone && installBtn) {
+        installBtn.classList.remove('hidden');
+        installBtn.classList.add('flex');
+        installBtn.addEventListener('click', () => {
+            alert("iPhone'da o'rnatish uchun:
+1. Safari pastida o'rtada turgan 'Ulashish' (Share / Поделиться) tugmasini bosing.
+2. Chiqqan ro'yxatdan 'На экран Домой' (Add to Home Screen) ni tanlang va 'Qo'shish' ni bosing.");
+        });
+    }
+
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
-      const installBtn = document.getElementById('install-btn');
-      if(installBtn) {
+      if(installBtn && !isIOS) {
           installBtn.classList.remove('hidden');
           installBtn.classList.add('flex');
+          // clear previous listeners just in case
+          const newBtn = installBtn.cloneNode(true);
+          installBtn.parentNode.replaceChild(newBtn, installBtn);
+          installBtn = newBtn;
+          
           installBtn.addEventListener('click', () => {
             deferredPrompt.prompt();
             deferredPrompt.userChoice.then((choiceResult) => {
@@ -477,6 +499,9 @@
               }
               deferredPrompt = null;
             });
+          });
+      }
+    });
           });
       }
     });
