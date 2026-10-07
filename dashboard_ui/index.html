@@ -3,7 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
     <title>Tender Boshqaruv Markazi</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tenderlar">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -77,7 +85,13 @@
                     
                     <div class="flex items-center gap-6">
                         <!-- Notification Hint (Small) -->
-                        <button @click="toggleReminders" id="reminder-btn" class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full text-xs cursor-pointer hover:bg-slate-100 transition-colors shadow-sm" :class="remindersEnabled ? 'text-slate-700' : 'text-slate-400'" :title="remindersEnabled ? 'Bot Eslatmalari yoniq. O\'chirish uchun bosing' : 'Bot Eslatmalari o\'chiq. Yoqish uchun bosing'">
+                        
+                        <button id="install-btn" class="hidden items-center gap-2 bg-primary-50 border border-primary-200 px-3 py-1.5 rounded-full text-xs font-bold text-primary-700 cursor-pointer hover:bg-primary-100 transition-colors shadow-sm">
+                            <i class="fa-solid fa-download"></i> O'rnatish
+                        </button>
+                        
+                        <button @click="toggleReminders"
+ id="reminder-btn" class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full text-xs cursor-pointer hover:bg-slate-100 transition-colors shadow-sm" :class="remindersEnabled ? 'text-slate-700' : 'text-slate-400'" :title="remindersEnabled ? 'Bot Eslatmalari yoniq. O\'chirish uchun bosing' : 'Bot Eslatmalari o\'chiq. Yoqish uchun bosing'">
                             <i class="fa-solid fa-bell" :class="remindersEnabled ? 'text-amber-500' : 'text-slate-400'"></i>
                             <span class="hidden md:inline font-medium" v-text="remindersEnabled ? 'Eslatmalar: Yoqilgan' : 'Eslatmalar: O\'chirilgan'"></span>
                         </button>
@@ -438,7 +452,34 @@
             unmounted() {
                 window.removeEventListener('keydown', this.handleKeydown);
             }
-        }).mount('#app')
+                }).mount('#app');
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW xato:', err));
+      });
+    }
+
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const installBtn = document.getElementById('install-btn');
+      if(installBtn) {
+          installBtn.classList.remove('hidden');
+          installBtn.classList.add('flex');
+          installBtn.addEventListener('click', () => {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult) => {
+              if (choiceResult.outcome === 'accepted') {
+                installBtn.classList.add('hidden');
+                installBtn.classList.remove('flex');
+              }
+              deferredPrompt = null;
+            });
+          });
+      }
+    });
     </script>
 </body>
 </html>
