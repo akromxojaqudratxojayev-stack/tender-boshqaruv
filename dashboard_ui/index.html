@@ -21,7 +21,29 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
+        
+        /* Mobile Table as Cards */
+        @media (max-width: 768px) {
+            .overflow-x-auto table, .overflow-x-auto thead, .overflow-x-auto tbody, .overflow-x-auto th, .overflow-x-auto td, .overflow-x-auto tr {
+                display: block;
+                width: 100%;
+            }
+            .overflow-x-auto thead tr { display: none; }
+            .overflow-x-auto tr {
+                margin-bottom: 1rem;
+                border: 1px solid #e2e8f0;
+                border-radius: 0.75rem;
+                background-color: white;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            }
+            .overflow-x-auto td {
+                border-bottom: 1px solid #f1f5f9;
+                padding: 1rem !important;
+            }
+            .overflow-x-auto td:last-child { border-bottom: none; }
+        }
         [v-cloak] { display: none; }
+
     </style>
     <script>
         tailwind.config = {
@@ -55,9 +77,9 @@
                     
                     <div class="flex items-center gap-6">
                         <!-- Notification Hint (Small) -->
-                        <button @click="toggleReminders" class="hidden md:flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full text-xs cursor-pointer hover:bg-slate-100 transition-colors shadow-sm" :class="remindersEnabled ? 'text-slate-700' : 'text-slate-400'" :title="remindersEnabled ? 'Bot Eslatmalari yoniq. O\'chirish uchun bosing' : 'Bot Eslatmalari o\'chiq. Yoqish uchun bosing'">
+                        <button @click="toggleReminders" id="reminder-btn" class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full text-xs cursor-pointer hover:bg-slate-100 transition-colors shadow-sm" :class="remindersEnabled ? 'text-slate-700' : 'text-slate-400'" :title="remindersEnabled ? 'Bot Eslatmalari yoniq. O\'chirish uchun bosing' : 'Bot Eslatmalari o\'chiq. Yoqish uchun bosing'">
                             <i class="fa-solid fa-bell" :class="remindersEnabled ? 'text-amber-500' : 'text-slate-400'"></i>
-                            <span class="font-medium" v-text="remindersEnabled ? 'Eslatmalar: Yoqilgan' : 'Eslatmalar: O\'chirilgan'"></span>
+                            <span class="hidden md:inline font-medium" v-text="remindersEnabled ? 'Eslatmalar: Yoqilgan' : 'Eslatmalar: O\'chirilgan'"></span>
                         </button>
                         
                         <!-- Live Clock -->
