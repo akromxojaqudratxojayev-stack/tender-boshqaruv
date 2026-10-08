@@ -479,7 +479,7 @@
         });
     }
 
-    window.addEventListener('beforeinstallprompt', (e) => {
+        window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
       if(installBtn && !isIOS) {
@@ -502,9 +502,6 @@
           });
       }
     });
-          });
-      }
-    });
-    </script>
+  </script>
 </body>
 </html>
